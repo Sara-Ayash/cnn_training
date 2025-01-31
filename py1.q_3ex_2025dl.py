@@ -107,62 +107,7 @@ class BinaryClassificationModel(nn.Module):
         return x
 
 
-if __name__ == '__main__':
-    task = Task.init(project_name='Ex4', task_name=f'Tranning Custom CNN {time.time()}')
-    # Prepare the tranning dataset
-    train_dataset: datasets.ImageFolder = SmokingDataset('student_318411840_vs/Training/Training/smoking')
-    validate_dataset: datasets.ImageFolder = SmokingDataset('student_318411840_vs/Validation/Validation/smoking')
- 
-    train_loader = DataLoader(train_dataset, batch_size=20, shuffle=True, num_workers=4)
-    validation_loader = DataLoader(validate_dataset, batch_size=20, shuffle=True, num_workers=4)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    num_epochs = 4
-
-    model_path = "models_pth/model.pth"
-
-    print("Model file found. Loading the model...")
-    model = BinaryClassificationModel()
-    if os.path.exists(model_path):
-        model.load_state_dict(torch.load(model_path, weights_only=True))
-        
- 
-    # Define the model, Loss Function and Optimizer
-    model: nn.Module = BinaryClassificationModel()
-    loss_function = nn.BCELoss() 
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-
-    # Train the Model
-    model.to(device) 
-
-    for epoch in range(num_epochs):
-        model.train()
-        running_loss = 0.0
-        
-        for images, labels, _ in train_loader:
-            images, labels = images.to(device), labels.to(device, dtype=torch.float32)
-
-            # Forward pass
-            outputs = model(images).squeeze()
-            loss = loss_function(outputs, labels)
-            
-            # Bpadding=1ackward pass and optimization
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            running_loss += loss.item()
-        
-        Logger.current_logger().report_scalar(
-            title="Loss VS Epoch", series="Loss", iteration=epoch, value=running_loss
-        )
-
-            
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}")
-
-    torch.save(model.state_dict(), model_path)
-
-    # Validate the Model for binary classification
+def test_model(model, device, validation_loader):
     model.eval()
     correct = 0
     total = 0
@@ -172,12 +117,95 @@ if __name__ == '__main__':
             outputs = model(images).squeeze()
             predicted = (outputs > 0.5).float()
 
-            print("labels:\n", labels)
-            print("predicted:\n", predicted)
-            print("outputs:\n", outputs)
-            print("file_names:\n", file_names)
+            # print("labels:\n", labels)
+            # print("predicted:\n", predicted)
+            # print("outputs:\n", outputs)
+            # print("file_names:\n", file_names)
+
+            # Print the corresponding file names
+            mismatched_indices = (predicted != labels).nonzero(as_tuple=True)[0]
+
+            if len(mismatched_indices) > 0:
+                print("Mismatched predictions found in files:")
+                for idx in mismatched_indices:
+                    print(f"----- Mismatched prediction: ----- \nlabel: {labels[idx]}, \npredict: {predicted[idx]},\noutput: {outputs[idx]}, filename: {file_names[idx]}\n---------")
 
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+    
+    return f'{100 * correct / total:.2f}'
 
-    print(f'Validation Accuracy: {100 * correct / total:.2f}%')
+def train_epoch(model, device, train_loader):
+    loss_function = nn.BCELoss() 
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+
+    model.train()
+    running_loss = 0.0
+    for images, labels, _ in train_loader:
+        images, labels = images.to(device), labels.to(device, dtype=torch.float32)
+
+        # Forward pass
+        outputs = model(images).squeeze()
+        loss = loss_function(outputs, labels)
+        
+        # Bpadding=1ackward pass and optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item()
+    return running_loss
+
+    
+def main():
+    task = Task.init(project_name='Ex4', task_name=f'Trainning Custom CNN - test on Testing image{time.time()}')
+    # Prepare the tranning dataset
+    train_dataset: datasets.ImageFolder = SmokingDataset('student_318411840/Training/Training/smoking')
+    validate_dataset: datasets.ImageFolder = SmokingDataset('student_318411840/Validation/Validation/smoking')
+ 
+    train_loader = DataLoader(train_dataset, batch_size=20, shuffle=True, num_workers=4)
+    validation_loader = DataLoader(validate_dataset, batch_size=20, shuffle=True, num_workers=4)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    num_epochs = 10
+
+    model_path = "models_pth/model.pth"
+
+    print("Model file found. Loading the model...")
+    model = BinaryClassificationModel()
+    if os.path.exists(model_path):
+        model.load_state_dict(torch.load(model_path, weights_only=True))
+        
+    # Define the model, Loss Function and Optimizer
+    model: nn.Module = BinaryClassificationModel()
+   
+
+    # Train the Model
+    model.to(device) 
+
+    for epoch in range(num_epochs):
+        print(f"\n======= Epoch [{epoch+1}/{num_epochs}] =======")
+        running_loss = train_epoch(model, device, train_loader)
+        accuracy = test_model(model, device, validation_loader)
+        
+        print(f"Loss: {running_loss/len(train_loader):.4f} \nValidation Accuracy: {accuracy}%")
+        
+        Logger.current_logger().report_scalar(
+            title="Loss VS Epoch", series="Loss", iteration=epoch, value=running_loss
+        )
+        Logger.current_logger().report_scalar(
+            title="Accuracy VS Epoch", series="Loss", iteration=epoch, value=accuracy
+        )
+            
+    torch.save(model.state_dict(), model_path)
+
+
+    # accuracy = test_model(model, device, validation_loader)
+
+
+
+
+
+if __name__ == '__main__':
+    main()
+   
