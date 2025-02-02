@@ -8,7 +8,6 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from clearml import Task, Logger
-from torchvision.models import resnet18, ResNet18_Weights
 
 
 SMOKING = 1
@@ -43,12 +42,12 @@ class SmokingDataset(datasets.VisionDataset):
 
     def set_transform(self):
         return transforms.Compose([
-            transforms.Resize((150, 150)),  # שינוי גודל
-            transforms.RandomHorizontalFlip(p=0.5),  # היפוך אופקי עם הסתברות של 50%
-            transforms.RandomRotation(degrees=30),  # סיבוב עד 30 מעלות לכל כיוון
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # שינוי צבעים קל
-            transforms.ToTensor(),  # המרת תמונה ל-Tensor
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # נרמול לערכים בין -1 ל-1
+            transforms.Resize((150, 150)),  
+            transforms.RandomHorizontalFlip(p=0.5), 
+            transforms.RandomRotation(degrees=30), 
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+            transforms.ToTensor(), 
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  
         ])
 
 
@@ -153,7 +152,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    num_epochs = 0
+    num_epochs = 10
 
     model_path = "models_pth/model.pth"
 
