@@ -43,28 +43,13 @@ class SmokingDataset(datasets.VisionDataset):
 
     def set_transform(self):
         return transforms.Compose([
-            transforms.Resize((250, 250)),  # Resize images to 128x128
-            transforms.RandomRotation(20), 
-            transforms.RandomHorizontalFlip(0.5),
-            transforms.RandomVerticalFlip(0.3),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            transforms.Resize((150, 150)),  # שינוי גודל
+            transforms.RandomHorizontalFlip(p=0.5),  # היפוך אופקי עם הסתברות של 50%
+            transforms.RandomRotation(degrees=30),  # סיבוב עד 30 מעלות לכל כיוון
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # שינוי צבעים קל
+            transforms.ToTensor(),  # המרת תמונה ל-Tensor
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # נרמול לערכים בין -1 ל-1
         ])
-
-class ResNet18ClassificationModel(nn.Module):
-    def __init__(self):
-        super(ResNet18ClassificationModel, self).__init__()
-        self.resnet = resnet18(weights=ResNet18_Weights.DEFAULT)
-        
-        # התאמת השכבה האחרונה לסיווג בינארי
-        num_features = self.resnet.fc.in_features  # מספר הפיצ'רים שיוצאים מהשכבה האחרונה
-        self.resnet.fc = nn.Sequential(
-            nn.Linear(num_features, 1),  # שכבה אחת עם נוירון אחד
-            nn.Sigmoid()  # סיגמואיד להסתברות בינארית
-        )
-
-    def forward(self, x):
-        return self.resnet(x)
 
 
 class BinaryClassificationModel(nn.Module):
@@ -72,33 +57,33 @@ class BinaryClassificationModel(nn.Module):
         super(BinaryClassificationModel, self).__init__()
         self.conv = nn.Sequential(
             # First convolutional block
-            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),  # Output: 250x250
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),  
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # Down-sample: 125x125
+            nn.MaxPool2d(kernel_size=2, stride=2),  
             
             # Second convolutional block
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),  # Output: 125x125
-            nn.ReLU(),
-            # nn.MaxPool2d(kernel_size=2, stride=2),  # Down-sample: 63x63
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),  
+            nn.ReLU(),  
             
             # Third convolutional block
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),  # Output: 63x63
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1), 
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # Down-sample: 32x32
+            nn.MaxPool2d(kernel_size=2, stride=2),  
             
             # Fourth convolutional block
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),  # Output: 32x32
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),  
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2)  # Down-sample: 16x16
+            nn.MaxPool2d(kernel_size=2, stride=2) 
         )
         
         # Fully connected layers
         self.fully_connected = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * 15 * 15, 128),  # Adjust input size for 16x16 feature maps
+            nn.Linear(128 * 9 * 9, 128),  
             nn.ReLU(),
-            nn.Linear(128, 1),  # Single output for binary classification
-            nn.Sigmoid()  # Sigmoid activation for probabilities
+            nn.Dropout(p=0.5),
+            nn.Linear(128, 1),  
+            nn.Sigmoid()  
         )
 
     def forward(self, x):
@@ -112,15 +97,10 @@ def test_model(model, device, validation_loader):
     correct = 0
     total = 0
     with torch.no_grad():
-        for images, labels, file_names in validation_loader:
+        for index, (images, labels, file_names) in enumerate(validation_loader):
             images, labels = images.to(device), labels.to(device, dtype=torch.float32)
             outputs = model(images).squeeze()
             predicted = (outputs > 0.5).float()
-
-            # print("labels:\n", labels)
-            # print("predicted:\n", predicted)
-            # print("outputs:\n", outputs)
-            # print("file_names:\n", file_names)
 
             # Print the corresponding file names
             mismatched_indices = (predicted != labels).nonzero(as_tuple=True)[0]
@@ -132,12 +112,15 @@ def test_model(model, device, validation_loader):
 
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+        
+            
+            
     
     return f'{100 * correct / total:.2f}'
 
 def train_epoch(model, device, train_loader):
     loss_function = nn.BCELoss() 
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     model.train()
     running_loss = 0.0
@@ -158,16 +141,19 @@ def train_epoch(model, device, train_loader):
 
     
 def main():
-    task = Task.init(project_name='Ex4', task_name=f'Trainning Custom CNN - test on Testing image{time.time()}')
+    task = Task.init(project_name='Ex4', task_name=f'Trainning Custom CNN - V2 {time.time()}')
     # Prepare the tranning dataset
-    train_dataset: datasets.ImageFolder = SmokingDataset('student_318411840/Training/Training/smoking')
-    validate_dataset: datasets.ImageFolder = SmokingDataset('student_318411840/Validation/Validation/smoking')
+    train_dataset: datasets.ImageFolder = SmokingDataset('student_318411840_v2/Training/Training/smoking')
+    validate_dataset: datasets.ImageFolder = SmokingDataset('student_318411840_v2/Validation/Validation/smoking')
+    test_dataset: datasets.ImageFolder = SmokingDataset('student_318411840_v2/Testing/Testing/smoking')
  
-    train_loader = DataLoader(train_dataset, batch_size=20, shuffle=True, num_workers=4)
-    validation_loader = DataLoader(validate_dataset, batch_size=20, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True, num_workers=4)
+    validation_loader = DataLoader(validate_dataset, batch_size=2, shuffle=True, num_workers=4)
+    test_loader = DataLoader(test_dataset, batch_size=4, shuffle=True, num_workers=4)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    num_epochs = 10
+    num_epochs = 0
 
     model_path = "models_pth/model.pth"
 
@@ -194,13 +180,14 @@ def main():
             title="Loss VS Epoch", series="Loss", iteration=epoch, value=running_loss
         )
         Logger.current_logger().report_scalar(
-            title="Accuracy VS Epoch", series="Loss", iteration=epoch, value=accuracy
+                title="Accuracy VS Epoch", series="Accuracy", iteration=epoch, value=accuracy
         )
             
     torch.save(model.state_dict(), model_path)
 
 
-    # accuracy = test_model(model, device, validation_loader)
+    # accuracy = test_model(model, device, test_loader)
+    # print(f"\nValidation Accuracy on the testing set: {accuracy}%")
 
 
 
